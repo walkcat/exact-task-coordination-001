@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目管理协调工具 - 离线版</title>
+<style>
+:root {
+  --primary-color: #4a90d9;
+  --primary-light: #e8f0fe;
+  --primary-dark: #3a7bc8;
+  --input-border-color: #b0c4de;
+  --success-color: #28a745;
+  --warning-color: #dc3545;
+  --edit-color: #f0ad4e;
+  --bg-color: #f0f2f5;
+  --card-bg: #ffffff;
+  --text-color: #333333;
+  --text-muted: #666666;
+  --border-radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; background: var(--bg-color); color: var(--text-color); line-height: 1.5; font-size: 14px; }
+
+/* App Header */
+.app-header { display: flex; justify-content: center; align-items: center; position: relative; padding: 8px 12px; }
+.app-header h1 { text-align: center; color: var(--primary-color); margin: 0; font-size: 22px; font-weight: 700; }
+.header-badge { position: absolute; right: 12px; font-size: 11px; color: var(--text-muted); background: var(--primary-light); padding: 3px 10px; border-radius: 10px; }
+
+/* Project Tabs */
+.project-tabs { max-width: 1800px; margin: 0 auto; padding: 0 12px 8px; }
+.project-tabs-list { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border-bottom: 2px solid #e0e0e0; padding-bottom: 0; }
+.project-tab { display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: var(--text-muted); background: transparent; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; border-radius: 6px 6px 0 0; transition: all 0.2s; white-space: nowrap; }
+.project-tab:hover { background: var(--primary-light); color: var(--primary-color); }
+.project-tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); background: var(--primary-light); font-weight: 600; }
+.project-tab-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.project-tab-actions { display: none; align-items: center; gap: 2px; margin-left: 2px; }
+.project-tab:hover .project-tab-actions, .project-tab.active .project-tab-actions { display: inline-flex; }
+.project-tab-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: none; background: transparent; border-radius: 3px; cursor: pointer; color: var(--text-muted); transition: all 0.15s; padding: 0; font-size: 12px; }
+.project-tab-icon-btn:hover { background: rgba(0,0,0,0.08); color: var(--primary-color); }
+.project-tab-icon-btn.delete:hover { color: var(--warning-color); }
+.project-tab-input { width: 80px; padding: 2px 6px; font-size: 13px; border: 1px solid var(--input-border-color); border-radius: 4px; outline: none; }
+.project-tab-input:focus { border-color: var(--primary-color); }
+.project-tab.add-btn { color: var(--primary-color); font-weight: 500; gap: 3px; opacity: 0.8; cursor: pointer; background: none; }
+.project-tab.add-btn:hover { opacity: 1; background: var(--primary-light); }
+
+/* Main Layout */
+.main-layout { display: flex; gap: 12px; padding: 0 12px 12px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
+.left-panel { width: 340px; min-width: 340px; background: var(--card-bg); border: 2px solid var(--primary-color); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 12px; transition: all 0.3s ease; flex-shrink: 0; }
+.left-panel.collapsed { width: 0; min-width: 0; padding: 0; border: none; overflow: hidden; margin: 0; }
+.left-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 2px solid var(--primary-color); padding-bottom: 6px; }
+.left-panel-header h2 { font-size: 16px; color: var(--primary-color); margin: 0; }
+.toggle-form-btn { background: var(--primary-color); color: white; border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: transform 0.3s; }
+.toggle-form-btn.collapsed { transform: rotate(180deg); }
+.form-content-wrapper { max-height: 2000px; overflow: hidden; transition: max-height 0.4s ease; }
+.form-content-wrapper.collapsed { max-height: 0; }
+
+/* Form */
+.task-form .form-row { display: flex; gap: 8px; }
+.task-form .form-row .form-group { flex: 1; }
+.task-form .form-group { margin-bottom: 8px; }
+.task-form label { display: block; font-size: 13px; font-weight: 600; color: var(--text-color); margin-bottom: 2px; }
+.task-form input, .task-form select, .task-form textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--input-border-color); border-radius: 4px; font-size: 13px; transition: border-color 0.2s; }
+.task-form input:focus, .task-form select:focus, .task-form textarea:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(74,144,217,0.2); }
+.task-form textarea { resize: vertical; min-height: 50px; }
+.custom-group { margin-top: 4px; position: relative; }
+.custom-group input { width: 100%; }
+.custom-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--input-border-color); border-top: none; border-radius: 0 0 4px 4px; max-height: 120px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.custom-dropdown-item { padding: 4px 8px; cursor: pointer; font-size: 13px; }
+.custom-dropdown-item:hover { background: var(--primary-light); }
+
+/* Buttons */
+.form-submit-btn { width: 100%; padding: 8px; background: var(--primary-color); color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 6px; transition: background 0.2s; }
+.form-submit-btn:hover { background: var(--primary-dark); }
+.form-submit-btn.edit-save-mode { background: var(--edit-color); }
+.form-submit-btn.edit-save-mode:hover { background: #ec971f; }
+.cancel-edit-btn { width: 100%; padding: 6px; background: #6c757d; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; margin-top: 4px; }
+.cancel-edit-btn:hover { background: #5a6268; }
+.action-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0; }
+.action-buttons button { flex: 1 1 calc(50% - 6px); min-width: 0; padding: 7px 4px; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; color: white; transition: opacity 0.2s; }
+.action-buttons button:hover { opacity: 0.85; }
+.export-btn { background: #17a2b8; }
+.weekly-report-btn { background: #6f42c1; }
+.monthly-report-btn { background: #e83e8c; }
+.export-pdf-btn { background: #fd7e14; }
+.save-file-btn { background: var(--success-color); }
+.import-file-btn { background: #795548; }
+
+/* Right Panel */
+.right-panel { flex: 1; background: var(--card-bg); border: 2px solid var(--primary-color); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 12px; overflow-x: auto; min-width: 0; }
+.right-panel.full-screen { width: 100%; }
+.right-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 2px solid var(--primary-color); padding-bottom: 6px; }
+.right-panel-header h2 { font-size: 16px; color: var(--primary-color); margin: 0; }
+.header-controls { display: flex; gap: 6px; }
+.view-toggle-btn, .panel-toggle-btn { background: var(--primary-color); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+.view-toggle-btn:hover, .panel-toggle-btn:hover { background: var(--primary-dark); }
+.panel-toggle-btn .icon { display: inline-block; transition: transform 0.3s; }
+.panel-toggle-btn .icon.rotated { transform: rotate(180deg); }
+
+/* Table */
+.task-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.task-table th, .task-table td { border: 1px solid #d0d0d0; padding: 6px 8px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+.task-table th { background: var(--primary-color); color: white; font-weight: 600; font-size: 12px; position: sticky; top: 0; white-space: nowrap; }
+.col-professional { width: 70px; } .col-source { width: 70px; } .col-description { width: 120px; } .col-comments { width: 240px; }
+.col-creator { width: 60px; } .col-collaborators { width: 70px; } .col-start-date { width: 85px; white-space: nowrap; }
+.col-end-date { width: 85px; white-space: nowrap; } .col-status { width: 60px; } .col-actions { width: 90px; }
+.right-panel.full-screen .task-table .col-description { width: 180px; }
+.right-panel.full-screen .task-table .col-comments { width: 340px; }
+.task-table tbody tr:nth-child(even) { background: #f9f9f9; }
+.task-table tbody tr:hover { background: var(--primary-light); }
+.status-completed { color: var(--success-color); font-weight: 600; }
+.status-not-started { color: var(--text-color); }
+.status-in-progress { font-weight: 700; }
+.warning-task td { color: var(--warning-color) !important; font-weight: 700 !important; }
+.due-soon td { color: var(--warning-color) !important; font-weight: 700 !important; background: #fff0f0 !important; }
+.professional-group td, .section-separator td { background: var(--primary-light) !important; font-weight: 700; color: var(--primary-color); font-size: 13px; padding: 6px 10px; border-bottom: 2px solid var(--primary-color); }
+.quadrant-1 { border-left: 3px solid #dc3545 !important; }
+.quadrant-2 { border-left: 3px solid #fd7e14 !important; }
+.quadrant-3 { border-left: 3px solid #ffc107 !important; }
+.task-table td:last-child { white-space: nowrap; }
+.task-table td:last-child .action-group { display: flex; justify-content: center; gap: 6px; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; width: 28px; height: 28px; padding: 0; cursor: pointer; color: white; transition: background 0.2s, box-shadow 0.2s, transform 0.1s; font-size: 14px; }
+.edit-btn { background: var(--primary-color); }
+.edit-btn:hover { background: var(--primary-dark); box-shadow: 0 2px 6px rgba(74,144,217,0.35); transform: translateY(-1px); }
+.delete-btn { background: var(--warning-color); }
+.delete-btn:hover { background: #c82333; box-shadow: 0 2px 6px rgba(220,53,69,0.35); transform: translateY(-1px); }
+.success-message { background: var(--success-color); color: white; text-align: center; padding: 8px; border-radius: 4px; margin-top: 6px; font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.3s; }
+.success-message.show { opacity: 1; }
+.empty-hint { text-align: center; padding: 60px 20px; color: #999; }
+.empty-hint p:first-child { font-size: 18px; margin-bottom: 8px; }
+
+/* Report Modal */
+.report-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.report-modal { background: white; border-radius: var(--border-radius); width: 90%; max-width: 1100px; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); padding: 20px; position: relative; }
+.report-modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 12px; }
+.report-modal-header h2 { color: var(--primary-color); font-size: 18px; margin: 0; }
+.close-modal-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; padding: 0 4px; }
+.close-modal-btn:hover { color: var(--warning-color); }
+.report-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; padding: 10px; background: #f8f9fa; border-radius: 4px; }
+.report-filters label { font-size: 13px; font-weight: 600; }
+.report-filters select { padding: 4px 8px; border: 1px solid var(--input-border-color); border-radius: 4px; font-size: 13px; }
+.generate-report-btn { background: var(--primary-color); color: white; border: none; border-radius: 4px; padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.generate-report-btn:hover { background: var(--primary-dark); }
+.report-summary { background: var(--primary-light); padding: 10px; border-radius: 4px; margin-bottom: 12px; font-size: 13px; line-height: 1.6; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.report-table th, .report-table td { border: 1px solid #d0d0d0; padding: 5px 6px; text-align: left; }
+.report-table th { background: var(--primary-color); color: white; font-size: 12px; }
+.report-table tbody tr:nth-child(even) { background: #f9f9f9; }
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .main-layout { flex-direction: column; }
+  .left-panel { width: 100%; min-width: 100%; }
+  .left-panel.collapsed { width: 100%; min-width: 100%; max-height: 0; padding: 0 12px; border: 2px solid transparent; }
+  .action-buttons button { font-size: 11px; padding: 6px 3px; }
+}
+@media (max-width: 768px) {
+  .app-header h1 { font-size: 18px; }
+  .left-panel, .right-panel { padding: 8px; }
+  .task-table { font-size: 11px; }
+  .task-table th, .task-table td { padding: 4px 5px; }
+  .action-buttons button { flex: 1 1 100%; font-size: 12px; }
+}
+@media (max-width: 480px) {
+  .app-header h1 { font-size: 16px; }
+  .main-layout { padding: 0 6px 6px; }
+  .task-form label { font-size: 12px; }
+  .task-form input, .task-form select, .task-form textarea { font-size: 12px; padding: 5px 6px; }
+  .task-table { font-size: 10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>项目管理协调工具</h1>
+  <span class="header-badge">离线版</span>
+</div>
+
+<div class="project-tabs">
+  <div class="project-tabs-list" id="projectTabsList"></div>
+</div>
+
+<div id="emptyHint" class="empty-hint" style="display:none;">
+  <p>请先创建一个项目</p>
+  <p>点击上方「+ 新建项目」开始</p>
+</div>
+
+<div id="mainContent" class="main-layout" style="display:none;">
+  <div class="left-panel" id="leftPanel">
+    <div class="left-panel-header">
+      <h2>任务添加</h2>
+      <button class="toggle-form-btn" id="toggleFormBtn" onclick="toggleForm()">▲</button>
+    </div>
+    <div class="form-content-wrapper" id="formWrapper">
+      <form class="task-form" id="taskForm" onsubmit="handleSubmit(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>专业分类</label>
+            <select id="f_professional" onchange="onProfChange()" required>
+              <option>建筑</option><option>结构</option><option>机电</option><option>景观</option><option>精装</option><option>自定义</option>
+            </select>
+            <div class="custom-group" id="customProfGroup" style="display:none;">
+              <input type="text" id="f_customProfessional" placeholder="输入自定义专业分类">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>事项来源</label>
+            <select id="f_taskSource" onchange="onSrcChange()" required>
+              <option>设计管理</option><option>招标管理</option><option>合同管理</option><option>配套管理</option><option>施工管理</option><option>变更管理</option><option>自定义</option>
+            </select>
+            <div class="custom-group" id="customSrcGroup" style="display:none;">
+              <input type="text" id="f_customTaskSource" placeholder="输入自定义事项来源">
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>任务内容</label>
+          <textarea id="f_description" rows="2" required></textarea>
+        </div>
+        <div class="form-group">
+          <label>任务进展</label>
+          <textarea id="f_comments" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>负责人</label><input type="text" id="f_creator" required></div>
+          <div class="form-group"><label>协作人</label><input type="text" id="f_collaborators" placeholder="多人用逗号分隔"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>开始日期</label><input type="date" id="f_createDate" required></div>
+          <div class="form-group"><label>完成日期</label><input type="date" id="f_planDate" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>是否重要</label>
+            <select id="f_isImportant"><option value="">请选择</option><option>是</option><option>否</option></select>
+          </div>
+          <div class="form-group">
+            <label>预警天数</label>
+            <input type="number" id="f_warningDays" min="1" value="7" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>优先级</label>
+            <select id="f_priority"><option value="">请选择</option><option>高</option><option>中</option><option>低</option></select>
+          </div>
+          <div class="form-group">
+            <label>完成状态</label>
+            <select id="f_status" required><option>未开始</option><option>进行中</option><option>已完成</option></select>
+          </div>
+        </div>
+        <button type="submit" class="form-submit-btn" id="submitBtn">添加任务</button>
+        <button type="button" class="cancel-edit-btn" id="cancelEditBtn" style="display:none;" onclick="cancelEdit()">取消编辑</button>
+        <div class="success-message" id="successMsg"></div>
+      </form>
+    </div>
+    <div class="action-buttons">
+      <button class="export-btn" onclick="exportExcel()">导出Excel</button>
+      <button class="export-pdf-btn" onclick="exportPDF()">导出PDF</button>
+      <button class="weekly-report-btn" onclick="openReport('weekly')">周报</button>
+      <button class="monthly-report-btn" onclick="openReport('monthly')">月报</button>
+      <button class="save-file-btn" onclick="exportJSON()">导出备份</button>
+      <button class="import-file-btn" onclick="importJSON()">导入备份</button>
+    </div>
+  </div>
+
+  <div class="right-panel" id="rightPanel">
+    <div class="right-panel-header">
+      <h2>任务列表</h2>
+      <div class="header-controls">
+        <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">视图切换：按专业分类</button>
+        <button class="panel-toggle-btn" onclick="togglePanel()"><span class="icon" id="panelIcon">◀</span></button>
+      </div>
+    </div>
+    <table class="task-table" id="taskTable">
+      <colgroup>
+        <col class="col-professional"><col class="col-source"><col class="col-description"><col class="col-comments">
+        <col class="col-creator"><col class="col-collaborators"><col class="col-start-date"><col class="col-end-date">
+        <col class="col-status"><col class="col-actions">
+      </colgroup>
+      <thead><tr>
+        <th>专业分类</th><th>事项来源</th><th>任务内容</th><th>任务进展</th>
+        <th>负责人</th><th>协作人</th><th>开始日期</th><th>完成日期</th><th>完成状态</th><th>操作</th>
+      </tr></thead>
+      <tbody id="taskBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div class="report-modal-overlay" id="reportModal" style="display:none;" onclick="if(event.target===this)closeReport()">
+  <div class="report-modal">
+    <div class="report-modal-header">
+      <h2 id="reportTitle">周报</h2>
+      <button class="close-modal-btn" onclick="closeReport()">×</button>
+    </div>
+    <div class="report-filters">
+      <label>年份：</label>
+      <select id="reportYear"></select>
+      <span id="weekFilterGroup">
+        <label>周次：</label>
+        <select id="reportWeek"></select>
+      </span>
+      <span id="monthFilterGroup" style="display:none;">
+        <label>月份：</label>
+        <select id="reportMonth"></select>
+      </span>
+      <button class="generate-report-btn" onclick="generateReport()">生成报告</button>
+    </div>
+    <div class="report-summary" id="reportSummary" style="display:none;"></div>
+    <table class="report-table" id="reportTable" style="display:none;">
+      <thead><tr>
+        <th>专业分类</th><th>事项来源</th><th>任务内容</th><th>任务进展</th>
+        <th>负责人</th><th>协作人</th><th>开始日期</th><th>完成日期</th><th>完成状态</th>
+      </tr></thead>
+      <tbody id="reportTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleImportJSON(event)">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+// ===== Data =====
+const STORAGE_KEY = 'pm_tool_offline_data';
+let data = loadData();
+let viewMode = 'professional';
+let editingId = null;
+let formCollapsed = false;
+let panelCollapsed = false;
+let currentReportType = 'weekly';
+
+function loadData() {
+  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : { projects: [], tasks: [], activeProjectId: null }; }
+  catch { return { projects: [], tasks: [], activeProjectId: null }; }
+}
+function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function getToday() { return new Date().toISOString().slice(0, 10); }
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ===== Projects =====
+function renderProjects() {
+  const list = document.getElementById('projectTabsList');
+  list.innerHTML = '';
+  data.projects.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'project-tab' + (p.id === data.activeProjectId ? ' active' : '');
+    div.innerHTML = `<span class="project-tab-name">${esc(p.name)}</span>
+      <span class="project-tab-actions">
+        <button class="project-tab-icon-btn" onclick="event.stopPropagation();renameProject('${p.id}')" title="重命名">✎</button>
+        <button class="project-tab-icon-btn delete" onclick="event.stopPropagation();deleteProject('${p.id}')" title="删除">✕</button>
+      </span>`;
+    div.onclick = () => selectProject(p.id);
+    list.appendChild(div);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'project-tab add-btn';
+  addBtn.innerHTML = '+ 新建项目';
+  addBtn.onclick = addProject;
+  list.appendChild(addBtn);
+  document.getElementById('emptyHint').style.display = data.projects.length === 0 ? 'block' : 'none';
+  document.getElementById('mainContent').style.display = data.activeProjectId ? 'flex' : 'none';
+}
+
+function addProject() {
+  const name = prompt('请输入项目名称：');
+  if (!name || !name.trim()) return;
+  const p = { id: uuid(), name: name.trim(), created_at: new Date().toISOString() };
+  data.projects.push(p);
+  data.activeProjectId = p.id;
+  saveData(); render();
+}
+
+function deleteProject(id) {
+  if (!confirm('删除项目将同时删除其下所有任务，确定吗？')) return;
+  data.projects = data.projects.filter(p => p.id !== id);
+  data.tasks = data.tasks.filter(t => t.projectId !== id);
+  if (data.activeProjectId === id) data.activeProjectId = data.projects.length > 0 ? data.projects[0].id : null;
+  saveData(); render();
+}
+
+function renameProject(id) {
+  const p = data.projects.find(x => x.id === id);
+  if (!p) return;
+  const name = prompt('请输入新名称：', p.name);
+  if (!name || !name.trim()) return;
+  p.name = name.trim();
+  saveData(); render();
+}
+
+function selectProject(id) {
+  data.activeProjectId = id;
+  cancelEdit();
+  saveData(); render();
+}
+
+// ===== Tasks =====
+function getActiveProjectTasks() { return data.tasks.filter(t => t.projectId === data.activeProjectId); }
+function getDisplayProfessional(t) { return t.professional === '自定义' ? (t.customProfessional || '自定义') : t.professional; }
+function getDisplaySource(t) { return t.taskSource === '自定义' ? (t.customTaskSource || '自定义') : t.taskSource; }
+
+function isWarningTask(t) {
+  if (!t.planDate || t.status === '已完成') return false;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const plan = new Date(t.planDate); plan.setHours(0,0,0,0);
+  return (plan - now) / 86400000 <= t.warningDays;
+}
+function isDueSoon(t) {
+  if (!t.planDate || t.status === '已完成') return false;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const plan = new Date(t.planDate); plan.setHours(0,0,0,0);
+  return plan < now;
+}
+
+function groupTasks(tasks, mode) {
+  const map = new Map(); const completed = [];
+  tasks.forEach(t => {
+    if (t.status === '已完成') { completed.push(t); return; }
+    const key = mode === 'professional' ? getDisplayProfessional(t) : getDisplaySource(t);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(t);
+  });
+  if (completed.length > 0) map.set('已完成', completed);
+  return map;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('taskBody');
+  const tasks = getActiveProjectTasks();
+  if (tasks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px;">暂无任务</td></tr>';
+    return;
+  }
+  const grouped = groupTasks(tasks, viewMode);
+  let html = '';
+  grouped.forEach((gTasks, group) => {
+    const label = viewMode === 'professional' ? '专业分类' : '事项来源';
+    html += `<tr class="professional-group section-separator"><td colspan="10">${label}：${esc(group)}（${gTasks.length}项）</td></tr>`;
+    gTasks.forEach(t => {
+      const warning = isWarningTask(t); const dueSoon = isDueSoon(t);
+      let qClass = '';
+      if (t.isImportant === '是' && t.priority === '高') qClass = 'quadrant-1';
+      else if (t.isImportant === '是') qClass = 'quadrant-2';
+      else if (t.priority === '高') qClass = 'quadrant-3';
+      const rowClass = [warning ? 'warning-task' : '', dueSoon ? 'due-soon' : '', qClass].filter(Boolean).join(' ');
+      const isIPNW = t.status === '进行中' && !warning && !dueSoon;
+      let style = '';
+      if (t.status === '已完成') style = 'color:#28a745;font-weight:600;';
+      else if (isIPNW) style = 'color:#000;font-weight:700;';
+      const sClass = (t.status === '已完成' || isIPNW) ? '' : (t.status === '进行中' ? 'status-in-progress' : (t.status === '未开始' ? 'status-not-started' : ''));
+      html += `<tr class="${rowClass}">
+        <td style="${style}">${esc(getDisplayProfessional(t))}</td>
+        <td style="${style}">${esc(getDisplaySource(t))}</td>
+        <td style="${style}">${esc(t.description)}</td>
+        <td style="${style}">${esc(t.comments)}</td>
+        <td style="${style}">${esc(t.creator)}</td>
+        <td style="${style}">${esc(t.collaborators)}</td>
+        <td style="${style}">${t.createDate||''}</td>
+        <td style="${style}">${t.planDate||''}</td>
+        <td style="${style}" class="${sClass}">${t.status}</td>
+        <td><span class="action-group">
+          <button class="edit-btn icon-btn" title="编辑" onclick="startEdit('${t.id}')">✎</button>
+          <button class="delete-btn icon-btn" title="删除" onclick="deleteTask('${t.id}')">✕</button>
+        </span></td>
+      </tr>`;
+    });
+  });
+  tbody.innerHTML = html;
+}
+
+// ===== Form =====
+function onProfChange() { document.getElementById('customProfGroup').style.display = document.getElementById('f_professional').value === '自定义' ? 'block' : 'none'; }
+function onSrcChange() { document.getElementById('customSrcGroup').style.display = document.getElementById('f_taskSource').value === '自定义' ? 'block' : 'none'; }
+
+function resetForm() {
+  ['f_professional','f_taskSource'].forEach(id => document.getElementById(id).selectedIndex = 0);
+  ['f_customProfessional','f_customTaskSource','f_description','f_comments','f_creator','f_collaborators','f_planDate'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f_createDate').value = getToday();
+  document.getElementById('f_isImportant').value = '';
+  document.getElementById('f_warningDays').value = '7';
+  document.getElementById('f_priority').value = '';
+  document.getElementById('f_status').value = '未开始';
+  onProfChange(); onSrcChange();
+}
+
+function getFormData() {
+  return {
+    professional: document.getElementById('f_professional').value,
+    customProfessional: document.getElementById('f_customProfessional').value,
+    taskSource: document.getElementById('f_taskSource').value,
+    customTaskSource: document.getElementById('f_customTaskSource').value,
+    description: document.getElementById('f_description').value,
+    comments: document.getElementById('f_comments').value,
+    creator: document.getElementById('f_creator').value,
+    collaborators: document.getElementById('f_collaborators').value,
+    createDate: document.getElementById('f_createDate').value,
+    planDate: document.getElementById('f_planDate').value,
+    isImportant: document.getElementById('f_isImportant').value,
+    warningDays: parseInt(document.getElementById('f_warningDays').value) || 7,
+    priority: document.getElementById('f_priority').value,
+    status: document.getElementById('f_status').value,
+  };
+}
+
+function handleSubmit(e) {
+  e.preventDefault();
+  const fd = getFormData();
+  if (fd.planDate && fd.createDate && fd.planDate < fd.createDate) { alert('完成日期不能早于开始日期！'); return; }
+  if (fd.warningDays < 1) { alert('预警天数必须>=1'); return; }
+  if (editingId) {
+    const t = data.tasks.find(x => x.id === editingId);
+    if (t) Object.assign(t, fd, { updatedAt: new Date().toISOString() });
+    showSuccess('任务已成功修改！');
+    editingId = null;
+    document.getElementById('submitBtn').textContent = '添加任务';
+    document.getElementById('submitBtn').classList.remove('edit-save-mode');
+    document.getElementById('cancelEditBtn').style.display = 'none';
+  } else {
+    data.tasks.push({ id: uuid(), projectId: data.activeProjectId, ...fd, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    showSuccess('任务已成功添加！');
+  }
+  saveData(); resetForm(); renderTable();
+}
+
+function startEdit(id) {
+  const t = data.tasks.find(x => x.id === id);
+  if (!t) return;
+  editingId = id;
+  document.getElementById('f_professional').value = t.professional;
+  document.getElementById('f_customProfessional').value = t.customProfessional || '';
+  document.getElementById('f_taskSource').value = t.taskSource;
+  document.getElementById('f_customTaskSource').value = t.customTaskSource || '';
+  document.getElementById('f_description').value = t.description;
+  document.getElementById('f_comments').value = t.comments || '';
+  document.getElementById('f_creator').value = t.creator || '';
+  document.getElementById('f_collaborators').value = t.collaborators || '';
+  document.getElementById('f_createDate').value = t.createDate || '';
+  document.getElementById('f_planDate').value = t.planDate || '';
+  document.getElementById('f_isImportant').value = t.isImportant || '';
+  document.getElementById('f_warningDays').value = t.warningDays || 7;
+  document.getElementById('f_priority').value = t.priority || '';
+  document.getElementById('f_status').value = t.status;
+  onProfChange(); onSrcChange();
+  document.getElementById('submitBtn').textContent = '保存修改';
+  document.getElementById('submitBtn').classList.add('edit-save-mode');
+  document.getElementById('cancelEditBtn').style.display = 'block';
+  document.getElementById('taskForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  editingId = null; resetForm();
+  document.getElementById('submitBtn').textContent = '添加任务';
+  document.getElementById('submitBtn').classList.remove('edit-save-mode');
+  document.getElementById('cancelEditBtn').style.display = 'none';
+}
+
+function deleteTask(id) {
+  if (!confirm('确定要删除此任务吗？')) return;
+  data.tasks = data.tasks.filter(t => t.id !== id);
+  if (editingId === id) cancelEdit();
+  saveData(); renderTable();
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('successMsg');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ===== Controls =====
+function toggleForm() {
+  formCollapsed = !formCollapsed;
+  document.getElementById('formWrapper').classList.toggle('collapsed', formCollapsed);
+  document.getElementById('toggleFormBtn').classList.toggle('collapsed', formCollapsed);
+}
+function togglePanel() {
+  panelCollapsed = !panelCollapsed;
+  document.getElementById('leftPanel').classList.toggle('collapsed', panelCollapsed);
+  document.getElementById('rightPanel').classList.toggle('full-screen', panelCollapsed);
+  document.getElementById('panelIcon').classList.toggle('rotated', panelCollapsed);
+}
+function toggleView() {
+  viewMode = viewMode === 'professional' ? 'taskSource' : 'professional';
+  document.getElementById('viewToggleBtn').textContent = '视图切换：' + (viewMode === 'professional' ? '按专业分类' : '按事项来源');
+  renderTable();
+}
+
+// ===== Report Modal =====
+function getWeekOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 1);
+  const diff = date.getTime() - start.getTime();
+  return Math.ceil((diff / 86400000 + start.getDay() + 1) / 7);
+}
+
+function openReport(type) {
+  currentReportType = type;
+  document.getElementById('reportTitle').textContent = type === 'weekly' ? '周报' : '月报';
+  document.getElementById('weekFilterGroup').style.display = type === 'weekly' ? '' : 'none';
+  document.getElementById('monthFilterGroup').style.display = type === 'monthly' ? '' : 'none';
+
+  const yearSel = document.getElementById('reportYear');
+  const curYear = new Date().getFullYear();
+  yearSel.innerHTML = '';
+  for (let y = curYear; y >= curYear - 5; y--) yearSel.innerHTML += `<option value="${y}">${y}</option>`;
+
+  if (type === 'weekly') {
+    const weekSel = document.getElementById('reportWeek');
+    const jan1 = new Date(curYear, 0, 1);
+    const dec31 = new Date(curYear, 11, 31);
+    const totalWeeks = Math.ceil(((dec31 - jan1) / 86400000 + 1) / 7);
+    weekSel.innerHTML = '';
+    for (let i = 1; i <= totalWeeks; i++) weekSel.innerHTML += `<option value="${i}">第${i}周</option>`;
+    weekSel.value = getWeekOfYear(new Date());
+  } else {
+    const monthSel = document.getElementById('reportMonth');
+    monthSel.innerHTML = '';
+    for (let m = 1; m <= 12; m++) monthSel.innerHTML += `<option value="${m}">${m}月</option>`;
+    monthSel.value = new Date().getMonth() + 1;
+  }
+
+  document.getElementById('reportSummary').style.display = 'none';
+  document.getElementById('reportTable').style.display = 'none';
+  document.getElementById('reportModal').style.display = 'flex';
+}
+
+function closeReport() { document.getElementById('reportModal').style.display = 'none'; }
+
+function generateReport() {
+  const year = parseInt(document.getElementById('reportYear').value);
+  const tasks = getActiveProjectTasks();
+  let filtered;
+  if (currentReportType === 'weekly') {
+    const week = parseInt(document.getElementById('reportWeek').value);
+    filtered = tasks.filter(t => {
+      const d = t.createDate ? new Date(t.createDate) : (t.planDate ? new Date(t.planDate) : null);
+      return d && d.getFullYear() === year && getWeekOfYear(d) === week;
+    });
+  } else {
+    const month = parseInt(document.getElementById('reportMonth').value);
+    filtered = tasks.filter(t => {
+      const d = t.createDate ? new Date(t.createDate) : (t.planDate ? new Date(t.planDate) : null);
+      return d && d.getFullYear() === year && d.getMonth() + 1 === month;
+    });
+  }
+
+  const total = filtered.length;
+  const completed = filtered.filter(t => t.status === '已完成').length;
+  const inProgress = filtered.filter(t => t.status === '进行中').length;
+  const notStarted = filtered.filter(t => t.status === '未开始').length;
+
+  const summary = document.getElementById('reportSummary');
+  summary.innerHTML = `<strong>报告摘要：</strong>总任务数：${total} | 已完成：${completed} | 进行中：${inProgress} | 未开始：${notStarted}`;
+  summary.style.display = 'block';
+
+  const tbody = document.getElementById('reportTableBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;">该时段无任务数据</td></tr>';
+  } else {
+    tbody.innerHTML = filtered.map(t => `<tr>
+      <td>${esc(getDisplayProfessional(t))}</td><td>${esc(getDisplaySource(t))}</td>
+      <td>${esc(t.description)}</td><td>${esc(t.comments)}</td>
+      <td>${esc(t.creator)}</td><td>${esc(t.collaborators)}</td>
+      <td>${t.createDate||''}</td><td>${t.planDate||''}</td><td>${t.status}</td>
+    </tr>`).join('');
+  }
+  document.getElementById('reportTable').style.display = 'table';
+}
+
+// ===== Export / Import =====
+function exportExcel() {
+  if (typeof XLSX === 'undefined') { alert('XLSX库未加载，请检查网络连接后刷新页面'); return; }
+  const tasks = getActiveProjectTasks();
+  const rows = tasks.map(t => ({
+    '专业分类': getDisplayProfessional(t), '事项来源': getDisplaySource(t),
+    '任务内容': t.description, '任务进展': t.comments, '负责人': t.creator,
+    '协作人': t.collaborators, '开始日期': t.createDate, '完成日期': t.planDate, '完成状态': t.status
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '任务列表');
+  const proj = data.projects.find(p => p.id === data.activeProjectId);
+  XLSX.writeFile(wb, (proj ? proj.name : '任务') + '_任务列表.xlsx');
+}
+
+function exportPDF() {
+  if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
+    alert('PDF导出库未加载，请检查网络连接后刷新页面'); return;
+  }
+  const el = document.getElementById('rightPanel');
+  html2canvas(el, { scale: 2, useCORS: true }).then(canvas => {
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jspdf.jsPDF('l', 'mm', 'a4');
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = canvas.height * pdfW / canvas.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+    const proj = data.projects.find(p => p.id === data.activeProjectId);
+    pdf.save((proj ? proj.name : '任务') + '_任务列表.pdf');
+  }).catch(() => alert('导出PDF失败，请稍后再试'));
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '项目管理协调工具_备份_' + getToday() + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function importJSON() { document.getElementById('fileInput').click(); }
+
+function handleImportJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (imported.projects && imported.tasks) {
+        if (confirm('导入将覆盖当前所有数据，确定吗？')) {
+          data = imported; saveData(); render();
+          alert('导入成功！');
+        }
+      } else { alert('无效的备份文件格式'); }
+    } catch { alert('文件解析失败'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ===== Render =====
+function render() { renderProjects(); if (data.activeProjectId) renderTable(); }
+
+// Init
+document.getElementById('f_createDate').value = getToday();
+render();
+</script>
+</body>
+</html>
