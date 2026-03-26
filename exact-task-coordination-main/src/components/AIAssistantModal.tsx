@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Task } from '@/types/task';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Sheet,
   SheetContent,
@@ -29,7 +28,7 @@ interface AIAssistantModalProps {
 type AIAction = 'classify' | 'report' | 'suggest' | 'summary' | 'risk' | 'predict' | 'chat';
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-assistant`;
+const CHAT_URL = 'https://deepseek-gateway.zeabur.app/api/chat';
 
 export default function AIAssistantModal({ open, onClose, tasks, onApplyClassification, classifyContext }: AIAssistantModalProps) {
   const [activeAction, setActiveAction] = useState<AIAction | null>(null);
@@ -83,10 +82,23 @@ export default function AIAssistantModal({ open, onClose, tasks, onApplyClassifi
     if (!desc.trim()) { setError('请输入任务描述'); return; }
     setLoading(true); setError(''); setClassifyResult(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('ai-assistant', {
-        body: { action: 'classify', context: { description: desc, creator: classifyContext?.creator || classifyCreator, comments: classifyContext?.comments || '' } },
+      const resp = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'classify', 
+          context: { 
+            description: desc, 
+            creator: classifyContext?.creator || classifyCreator, 
+            comments: classifyContext?.comments || '' 
+          } 
+        }),
       });
-      if (fnError) throw fnError;
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || `请求失败 (${resp.status})`);
+      }
+      const data = await resp.json();
       if (data?.error) throw new Error(data.error);
       setClassifyResult(data.result);
     } catch (e: any) { setError(e.message || 'AI分类失败'); }
@@ -101,7 +113,7 @@ export default function AIAssistantModal({ open, onClose, tasks, onApplyClassifi
     try {
       const resp = await fetch(CHAT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, tasks: taskPayload(), ...extraBody }),
         signal: controller.signal,
       });
@@ -154,7 +166,7 @@ export default function AIAssistantModal({ open, onClose, tasks, onApplyClassifi
     try {
       const resp = await fetch(CHAT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'chat', tasks: taskPayload(), messages: newMessages }),
         signal: controller.signal,
       });
