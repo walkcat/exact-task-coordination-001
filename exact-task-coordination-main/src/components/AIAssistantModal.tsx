@@ -150,38 +150,45 @@ export default function AIAssistantModal({ open, onClose, tasks, onApplyClassifi
     } finally { setLoading(false); abortRef.current = null; }
   }, [taskPayload]);
 
-  // Chat handler
-  const handleChat = useCallback(async () => {
-    if (!chatInput.trim() || loading) return;
-    const userMsg: ChatMessage = { role: 'user', content: chatInput };
-    const newMessages = [...chatMessages, userMsg];
-    setChatMessages(newMessages);
-    setChatInput('');
-    setLoading(true); setError('');
+// Chat handler - 修复版本
+const handleChat = useCallback(async () => {
+  if (!chatInput.trim() || loading) return;
+  const userMsg: ChatMessage = { role: 'user', content: chatInput };
+  const newMessages = [...chatMessages, userMsg];
+  setChatMessages(newMessages);
+  setChatInput('');
+  setLoading(true); 
+  setError('');
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    let assistantContent = '';
+  const controller = new AbortController();
+  abortRef.current = controller;
 
-    try {
-      const resp = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', tasks: taskPayload(), messages: newMessages }),
-        signal: controller.signal,
-      });
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.error || `请求失败 (${resp.status})`);
-      }
+  try {
+    const resp = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'chat', tasks: taskPayload(), messages: newMessages }),
+      signal: controller.signal,
+    });
+    
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.error || `请求失败 (${resp.status})`);
+    }
+
+    // 检查是否是流响应
+    const contentType = resp.headers.get('content-type') || '';
+    
+    if (contentType.includes('text/event-stream')) {
+      // SSE 流处理
       if (!resp.body) throw new Error('No response body');
-
-      // Add empty assistant message
       setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let assistantContent = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -209,11 +216,29 @@ export default function AIAssistantModal({ open, onClose, tasks, onApplyClassifi
           } catch { buffer = line + '\n' + buffer; break; }
         }
       }
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    } catch (e: any) {
-      if (e.name !== 'AbortError') setError(e.message || 'AI请求失败');
-    } finally { setLoading(false); abortRef.current = null; }
-  }, [chatInput, chatMessages, loading, taskPayload]);
+    } else {
+      // 普通 JSON 响应处理
+      const data = await resp.json();
+      const assistantContent = data.choices?.[0]?.message?.content || '';
+      
+      if (!assistantContent) {
+        throw new Error('AI 未返回有效内容');
+      }
+
+      setChatMessages(prev => [...prev, { role: 'assistant', content: assistantContent }]);
+    }
+
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  } catch (e: any) {
+    if (e.name !== 'AbortError') {
+      setError(e.message || 'AI请求失败');
+    }
+  } finally { 
+    setLoading(false); 
+    abortRef.current = null; 
+  }
+}, [chatInput, chatMessages, loading, taskPayload]);
+
 
   const ACTION_LIST: { key: AIAction; icon: string; title: string; desc: string }[] = [
     { key: 'chat', icon: '💬', title: 'AI 对话问答', desc: '自由对话，询问项目相关问题' },
